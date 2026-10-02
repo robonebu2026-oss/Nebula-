@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Teste de sensores do robô</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--eye:#f7d9e4}
+body{margin:0;background:#14121a;color:#e8e4f0;font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center;padding-bottom:30px}
+#screen{--ew:min(16vw,64px);margin-top:14px;width:min(92vw,380px);height:150px;background:#000;border-radius:28px;border:5px solid #2a2633;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#eyes{display:flex;gap:18%;transition:transform .25s}
+#eyes.wig{animation:wig .15s infinite}
+@keyframes wig{25%{transform:translateX(-8px) rotate(-4deg)}75%{transform:translateX(8px) rotate(4deg)}}
+.eye{position:relative;width:var(--ew);height:calc(var(--ew)*1.25);background:var(--eye);border-radius:50%;overflow:hidden;transition:all .25s}
+.eye::before{content:"";position:absolute;left:-30%;width:160%;top:-5%;height:var(--lt,0%);background:#000;transform:rotate(calc(var(--lr,0deg)*var(--s)));transform-origin:center top;transition:all .25s}
+.eye.l{--s:1}.eye.r{--s:-1}
+.eye::after{content:"";position:absolute;left:-20%;width:140%;height:100%;top:var(--ht,110%);background:#000;border-radius:50%;transition:all .25s}
+body[data-m=happy] .eye{--ht:52%}
+body[data-m=angry] .eye{--lt:55%;--lr:24deg;background:#ffb3b3}
+body[data-m=sad] .eye{--lt:50%;--lr:-22deg;background:#b9c9ff}
+body[data-m=sleepy] .eye{--lt:62%}
+body[data-m=surprised] .eye{transform:scale(1.18)}
+body[data-m=love] .eye{background:transparent;display:flex;align-items:center;justify-content:center;font-size:var(--ew);animation:beat .6s infinite}
+body[data-m=love] .eye::before,body[data-m=love] .eye::after,body[data-m=dizzy] .eye::before,body[data-m=dizzy] .eye::after{display:none}
+body[data-m=dizzy] .eye{animation:spin .5s linear infinite;background:repeating-radial-gradient(circle,#f7d9e4 0 5px,#000 5px 10px)}
+@keyframes beat{50%{transform:scale(1.15)}}@keyframes spin{to{transform:rotate(360deg)}}
+#msg{margin:12px 14px 0;min-height:22px;text-align:center;font-size:15px}
+button{background:#c0467a;color:#fff;border:0;border-radius:20px;padding:12px 20px;font-size:16px;margin:12px 4px 0}
+button.b2{background:#2a2633}
+#list{width:min(94vw,420px);margin-top:14px}
+.card{background:#201d29;border-radius:12px;padding:10px 12px;margin-bottom:8px;border-left:4px solid #555}
+.card.ok{border-color:#3fbf7f}.card.no{border-color:#e0556a}
+.card{display:flex;align-items:center;gap:10px}.card .t{flex:1}.card button{margin:0;padding:8px 14px;font-size:14px;flex-shrink:0}
+.card b{display:block;font-size:14px}.card .s{font-size:13px;opacity:.9}.card .v{font-size:12px;opacity:.6;font-family:monospace}
+</style></head>
+<body data-m="neutral">
+<div id="screen"><div id="eyes"><div class="eye l"></div><div class="eye r"></div></div></div>
+<div id="msg">Os sensores sem ✅ ou ❌ têm um botão "Ativar". Toque em cada um para testar.</div>
+<div id="list"></div>
+<script>
+const body=document.body,eyes=document.getElementById('eyes'),msg=document.getElementById('msg'),els=[...document.querySelectorAll('.eye')];
+const ROWS=[['mov','Sacudir / queda / andar'],['ori','Inclinar / de cabeça pra baixo'],['mic','Microfone (barulho, palma, silêncio)'],['cam','Câmera (luz e movimento)'],['voz','Reconhecimento de voz'],['bat','Bateria'],['net','Internet'],['hora','Hora do dia'],['oci','Ficar ignorado'],['toq','Toque (dedos e pressão)'],['vib','Vibração (saída)']];
+const L=document.getElementById('list');const BTN=['mov','ori','mic','cam','voz','vib'];const ran={};
+const wait=(id,t)=>{const r=document.getElementById('r-'+id);r.className='card';r.querySelector('.s').textContent='⏳ '+t};
+ROWS.forEach(([id,t])=>{L.insertAdjacentHTML('beforeend',`<div class="card" id="r-${id}"><div class="t"><b>${t}</b><div class="s">⏳ não testado</div><div class="v"></div></div>${BTN.includes(id)?`<button data-t="${id}">Ativar</button>`:''}</div>`)});
+const st=(id,ok,t)=>{const r=document.getElementById('r-'+id);r.className='card '+(ok?'ok':'no');r.querySelector('.s').textContent=(ok?'✅ ':'❌ ')+t};
+const val=(id,t)=>{document.getElementById('r-'+id).querySelector('.v').textContent=t};
+let mood='neutral',mt;
+function set(m,ms=2200,t){clearTimeout(mt);mood=m;body.dataset.m=m;els.forEach(e=>e.textContent=m==='love'?'❤️':'');if(t)msg.textContent=t;if(m!=='neutral')mt=setTimeout(()=>set('neutral'),ms)}
+function wig(){eyes.classList.add('wig');setTimeout(()=>eyes.classList.remove('wig'),1200)}
+function lookN(x,y){eyes.style.transform=`translate(${(x-.5)*60}px,${(y-.5)*30}px)`}
+const ERR={NotAllowedError:'permissão negada ou bloqueada pela janela',SecurityError:'bloqueado por segurança',NotFoundError:'não encontrado',NotReadableError:'em uso por outro app',NoAPI:'este navegador não oferece isso aqui'};
+const why=e=>ERR[e&&e.name]||(e&&e.name)||String(e);
+// hora
+(function(){const h=new Date().getHours();st('hora',true,h<5?'madrugada':h<12?'manhã':h<18?'tarde':'noite');val('hora',h+'h')})();
+// internet
+function net(){const on=navigator.onLine;st('net',true,on?'online':'offline');if(!on)set('sad',3000,'Sem internet... 😢')}
+addEventListener('online',net);addEventListener('offline',net);net();
+// bateria
+if(navigator.getBattery){navigator.getBattery().then(b=>{const u=()=>{st('bat',true,Math.round(b.level*100)+'% '+(b.charging?'carregando':'na bateria'));if(b.charging)set('happy',2500,'Comidinha! 🔋');else if(b.level<.2)set('sleepy',3000,'Tô fraquinho... 🪫')};u();b.onchargingchange=u;b.onlevelchange=u}).catch(e=>st('bat',false,why(e)))}else st('bat',false,'não disponível neste navegador');
+// toque + ociosidade
+let last=Date.now(),bored=false;const ptrs=new Map();
+addEventListener('pointerdown',e=>{last=Date.now();bored=false;ptrs.set(e.pointerId,1);st('toq',true,ptrs.size+' dedo(s)');val('toq','pressão '+(e.pressure||0).toFixed(2)+' · área '+Math.round(e.width)+'px');if(ptrs.size===3)set('love',2500,'Três dedos! 🥰');else if(!e.target.closest('button'))set('happy',1000)});
+addEventListener('pointerup',e=>ptrs.delete(e.pointerId));addEventListener('pointercancel',e=>ptrs.delete(e.pointerId));
+setInterval(()=>{const s=Math.round((Date.now()-last)/1000);st('oci',true,s>12?'entediado':'ativo');val('oci',s+'s sem toque');if(s>12&&!bored){bored=true;set('sad',4000,'Tô entediado... 🥱')}},1000);
+// vibrar
+function vibTest(){if(navigator.vibrate){navigator.vibrate([200,100,200]);st('vib',true,'comando enviado (se você sentiu, funciona)')}else st('vib',false,'não disponível neste navegador')}
+// movimento
+let gotM=false,free=0,shakes=0,peaks=[],lastS=0,lastP=0;
+function onMotion(e){const g=!!(e.accelerationIncludingGravity&&e.accelerationIncludingGravity.x!=null);const a=g?e.accelerationIncludingGravity:e.acceleration;if(!a||a.x==null)return;const m=Math.hypot(a.x,a.y,a.z),t=Date.now();
+ if(!gotM){gotM=true;st('mov',true,'sensor funcionando')}val('mov','força: '+m.toFixed(1)+' (parado ≈ 9.8)');
+ if(g&&m<2.5){if(++free>=4){free=0;set('surprised',2500,'Aaaah, tô caindo! 😱')}}else free=0;
+ const lin=e.acceleration&&e.acceleration.x!=null?Math.hypot(e.acceleration.x,e.acceleration.y,e.acceleration.z):Math.abs(m-9.8);
+ if(lin>11&&t-lastS>120){lastS=t;if(++shakes>=3){shakes=0;set('dizzy',2500,'Tô tonto! 😵')}}
+ setTimeout(()=>shakes=0,1000);
+ if(g&&m>13&&m<22&&t-lastP>280){lastP=t;peaks=peaks.filter(x=>t-x<4000);peaks.push(t);if(peaks.length>=5){peaks=[];wig();set('happy',2500,'Balançando, tá andando! 🚶')}}}
+let gotO=false;
+function onOri(e){if(e.beta==null)return;if(!gotO){gotO=true;st('ori',true,'sensor funcionando')}
+ val('ori','inclinação '+Math.round(e.beta)+'° / '+Math.round(e.gamma)+'°');
+ const g=Math.max(-45,Math.min(45,e.gamma||0))/45,b=Math.max(-45,Math.min(45,(e.beta||0)-45))/45;lookN(.5+g*.5,.5+b*.5);
+ if(Math.abs(e.beta)>130)set('surprised',1500,'De cabeça pra baixo! 🙃')}
+async function motionStart(w){
+ try{const C=w==='mov'?window.DeviceMotionEvent:window.DeviceOrientationEvent;
+  if(C&&C.requestPermission){const r=await C.requestPermission();if(r!=='granted')throw{name:'NotAllowedError'}}
+  if(w==='mov'){if(!ran.mov){ran.mov=1;addEventListener('devicemotion',onMotion)}wait('mov','mexa o celular...');setTimeout(()=>{if(!gotM)st('mov',false,'nenhum dado recebido (bloqueado ou sem sensor)')},3000)}
+  else{if(!ran.ori){ran.ori=1;addEventListener('deviceorientation',onOri)}wait('ori','incline o celular...');setTimeout(()=>{if(!gotO)st('ori',false,'nenhum dado recebido (bloqueado ou sem sensor)')},3000)}
+ }catch(e){st(w,false,why(e))}}
+// microfone
+async function micStart(){if(ran.mic)return;ran.mic=1;
+ try{if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw{name:'NoAPI'};
+  const s=await navigator.mediaDevices.getUserMedia({audio:true});const ctx=new (window.AudioContext||window.webkitAudioContext)();await ctx.resume();
+  const an=ctx.createAnalyser();an.fftSize=512;ctx.createMediaStreamSource(s).connect(an);const buf=new Uint8Array(512);let prev=0,quiet=0;
+  st('mic',true,'ouvindo');
+  setInterval(()=>{an.getByteTimeDomainData(buf);let q=0;for(const v of buf)q+=((v-128)/128)**2;const r=Math.sqrt(q/buf.length);val('mic','volume: '+r.toFixed(2));
+   if(r-prev>.2&&r>.15)set('happy',1800,'Palma! 👏');else if(r>.3)set('surprised',1500,'Que barulho! 😲');
+   if(r<.02){if(++quiet===60)set('sleepy',4000,'Silêncio... zzz 😴')}else quiet=0;prev=r},100)
+ }catch(e){ran.mic=0;st('mic',false,why(e))}}
+// câmera
+async function camStart(){if(ran.cam)return;ran.cam=1;
+ try{if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw{name:'NoAPI'};
+  const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}});const v=document.createElement('video');v.srcObject=s;v.muted=true;v.playsInline=true;await v.play();
+  const c=document.createElement('canvas');c.width=32;c.height=24;const x=c.getContext('2d',{willReadFrequently:true});let prev=null;st('cam',true,'vendo você');
+  setInterval(()=>{x.drawImage(v,0,0,32,24);const d=x.getImageData(0,0,32,24).data;let lum=0,n=0,sx=0,sy=0;const cur=new Uint8Array(768);
+   for(let i=0;i<768;i++){const l=(d[i*4]+d[i*4+1]+d[i*4+2])/3;cur[i]=l;lum+=l;if(prev&&Math.abs(l-prev[i])>28){n++;sx+=i%32;sy+=(i/32|0)}}
+   lum/=768;prev=cur;val('cam','luz: '+Math.round(lum)+'/255 · movimento: '+n);
+   if(lum<25){if(mood!=='sleepy')set('sleepy',3000,'Escureceu... 😴');return}
+   if(n>300){set('surprised',1500,'Muito perto! 😲');return}
+   if(n>12)lookN(1-sx/n/32,sy/n/24)},200)
+ }catch(e){ran.cam=0;st('cam',false,why(e))}}
+// voz
+function vozStart(){const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){st('voz',false,'não disponível neste navegador');return}
+ try{const r=new SR();r.lang='pt-BR';r.onstart=()=>st('voz',true,'ouvindo (fale algo)');r.onerror=e=>st('voz',false,'erro: '+e.error);
+  r.onresult=e=>{const t=e.results[e.results.length-1][0].transcript;val('voz','"'+t+'"');set('happy',1800,'Ouvi: '+t)};r.start();setTimeout(()=>{try{r.stop()}catch(_){}},8000)}catch(e){st('voz',false,why(e))}}
+L.onclick=e=>{const b=e.target.closest('button[data-t]');if(!b)return;const t=b.dataset.t;b.textContent='Testar de novo';
+ if(t==='mov'||t==='ori')motionStart(t);else({mic:micStart,cam:camStart,voz:vozStart,vib:vibTest})[t]()};
+</script></body></html>
